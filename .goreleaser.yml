@@ -1,8 +1,14 @@
 builds:
-  - goarch:
+  - goos:
+      - linux
+    goarch:
       - arm
     goarm:
       - 6
+  - goos:
+      - darwin
+    goarch:
+      - amd64
 release:
   github:
     owner: the-lightning-land
