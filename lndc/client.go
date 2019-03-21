@@ -221,7 +221,19 @@ func (client *Client) SendToRoute(req *lnrpc.SendToRouteRequest) (*bdb.Payment, 
 	}
 
 	if sendResult.PaymentError != "" {
-		return nil, mapPaymentErrorToTypedError(sendResult.PaymentError)
+		err := mapPaymentErrorToTypedError(sendResult.PaymentError)
+
+		// Extend the temporary channel failure error with amount that couldn't be forwarded
+		switch err := err.(type) {
+		case bdb.TemporaryChannelFailureError:
+			for _, hop := range req.Route.Hops {
+				if hop.ChanId == uint64(err.ChanId) {
+					err.AmtMsat = hop.AmtToForwardMsat
+				}
+			}
+		}
+
+		return nil, err
 	}
 
 	return &bdb.Payment{
