@@ -1,7 +1,6 @@
 package balancer
 
 import (
-	"encoding/hex"
 	"github.com/go-errors/errors"
 	"github.com/lightningnetwork/lnd/lnrpc"
 	"github.com/the-lightning-land/balanced/bdb"
@@ -132,7 +131,7 @@ func (b *Balancer) BalanceAll() error {
 func (b *Balancer) Balance(fullChanId bdb.ChanId, emptyChanId bdb.ChanId) (bool, error) {
 	identityPubKey, err := b.client.IdentitiyPubKey()
 	if err != nil {
-		return false, errors.Errorf("Could not identitiy pub key: %v", err)
+		return false, errors.Errorf("Could not identity pub key: %v", err)
 	}
 
 	graph, err := b.client.Graph()
@@ -212,13 +211,13 @@ func (b *Balancer) balance(fullChannel *bdb.Channel, fullChannelEdge *bdb.Edge,
 
 		time.Sleep(time.Second)
 
-		preimage, err := b.PayInvoiceThroughRoute(invoice, lndRoute)
+		payment, err := b.PayInvoiceThroughRoute(invoice, lndRoute)
 		if err != nil {
 			b.logger.Infof("Could not pay invoice: %v", err)
 			continue
 		}
 
-		b.logger.Infof("Successfully balanced with resulting preimage %v", hex.EncodeToString(preimage))
+		b.logger.Infof("Successfully balanced with payment %v", payment)
 
 		// Adjust the balances approximately, not considering fees for now
 		fullChannel.LocalBalance -= uint64(amtMsat) / 1000
@@ -260,8 +259,8 @@ func (b *Balancer) AddOrReuseInvoice(amtMsat int64) (*bdb.Invoice, error) {
 	return invoice, nil
 }
 
-func (b *Balancer) PayInvoiceThroughRoute(invoice *bdb.Invoice, lndRoute *lnrpc.Route) ([]byte, error) {
-	preimage, err := b.client.SendToRoute(&lnrpc.SendToRouteRequest{
+func (b *Balancer) PayInvoiceThroughRoute(invoice *bdb.Invoice, lndRoute *lnrpc.Route) (*bdb.Payment, error) {
+	payment, err := b.client.SendToRoute(&lnrpc.SendToRouteRequest{
 		PaymentHashString: invoice.PaymentHash,
 		Routes:            []*lnrpc.Route{lndRoute},
 	})
@@ -282,7 +281,7 @@ func (b *Balancer) PayInvoiceThroughRoute(invoice *bdb.Invoice, lndRoute *lnrpc.
 		b.cachedInvoices = append(b.cachedInvoices[:invoiceIndex], b.cachedInvoices[invoiceIndex+1:]...)
 	}
 
-	return preimage, nil
+	return payment, nil
 }
 
 // ConstructRoute builds a fully configured route (currently for lnd only)

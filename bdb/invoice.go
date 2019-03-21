@@ -11,3 +11,10 @@ type Invoice struct {
 	FallbackAddr    string
 	CltvExpiry      int64
 }
+
+type Payment struct {
+	PaymentHash     string
+	PaymentPreimage string
+	FeesMsat        int64
+	AmtMsat         int64
+}

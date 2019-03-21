@@ -9,6 +9,7 @@ import (
 	"github.com/kr/pretty"
 	"github.com/lightningnetwork/lnd/lnrpc"
 	log "github.com/sirupsen/logrus"
+	"github.com/the-lightning-land/balanced/bdb"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/metadata"
@@ -17,6 +18,20 @@ import (
 	"os"
 	"testing"
 )
+
+func TestParseError(t *testing.T) {
+	paymentError := "unable to route payment to destination: TemporaryChannelFailure(update=(*lnwire.ChannelUpdate)(0xcbe3cc0)({\n Signature: (lnwire.Sig) (len=64 cap=64) {\n  00000000  0b d4 c9 7f 09 ab 1d 3c  5b db a3 14 15 f9 5d 1f  |.......<[.....].|\n  00000010  27 79 2c 0b c5 b9 fb 01  da f1 17 4e f9 af 89 b5  |'y,........N....|\n  00000020  5a 17 3c f6 ea d1 af 9f  1b 85 12 2a 7b 13 9a 89  |Z.<........*{...|\n  00000030  f4 cf a8 83 6d f8 04 fd  e4 44 0b 57 34 d2 e7 10  |....m....D.W4...|\n },\n ChainHash: (chainhash.Hash) (len=32 cap=32) 000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f,\n ShortChannelID: (lnwire.ShortChannelID) 557807:665:1,\n Timestamp: (uint32) 1553189282,\n MessageFlags: (lnwire.ChanUpdateMsgFlags) 00000001,\n ChannelFlags: (lnwire.ChanUpdateChanFlags) 00000001,\n TimeLockDelta: (uint16) 144,\n HtlcMinimumMsat: (lnwire.MilliSatoshi) 1000 mSAT,\n BaseFee: (uint32) 0,\n FeeRate: (uint32) 1,\n HtlcMaximumMsat: (lnwire.MilliSatoshi) 1000000000 mSAT,\n ExtraOpaqueData: ([]uint8) <nil>\n})\n)"
+	err := mapPaymentErrorToTypedError(paymentError)
+
+	switch err := err.(type) {
+	case bdb.TemporaryChannelFailureError:
+		if err.ChanId != 613315282598428673 {
+			t.Errorf("Expected channel id of 613315282598428673; got %v", err.ChanId)
+		}
+	default:
+		t.Errorf("Expected temporary channel failure; got %T", err)
+	}
+}
 
 var client lnrpc.LightningClient
 var ctx context.Context
@@ -182,7 +197,7 @@ func TestDirectConnection(t *testing.T) () {
 
 func TestSendToRoute(t *testing.T) () {
 	var amtToSend int64 = 10000 * 1000
-			channelPath := []uint64{621791417835454464, 618904100220567552, 616646802897829888}
+	channelPath := []uint64{621791417835454464, 618904100220567552, 616646802897829888}
 
 	client, ctx, err := Connect()
 	if err != nil {

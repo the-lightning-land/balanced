@@ -11,6 +11,7 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/metadata"
 	"io/ioutil"
+	"regexp"
 )
 
 type Client struct {
@@ -213,17 +214,38 @@ func (client *Client) AddInvoice(amt int64) (*bdb.Invoice, error) {
 	}, nil
 }
 
-func (client *Client) SendToRoute(req *lnrpc.SendToRouteRequest) ([]byte, error) {
+func (client *Client) SendToRoute(req *lnrpc.SendToRouteRequest) (*bdb.Payment, error) {
 	sendResult, err := client.client.SendToRouteSync(client.context, req)
 	if err != nil {
 		return nil, errors.Errorf("Could not send to route: %v", err)
 	}
 
 	if sendResult.PaymentError != "" {
-		return nil, errors.Errorf("Could not send payment to route: %v", sendResult.PaymentError)
+		return nil, mapPaymentErrorToTypedError(sendResult.PaymentError)
 	}
 
-	return sendResult.PaymentPreimage, nil
+	return &bdb.Payment{
+		PaymentHash:     hex.EncodeToString(sendResult.PaymentHash),
+		PaymentPreimage: hex.EncodeToString(sendResult.PaymentPreimage),
+		FeesMsat:        sendResult.PaymentRoute.TotalFeesMsat,
+		AmtMsat:         sendResult.PaymentRoute.TotalAmtMsat,
+	}, nil
+}
+
+func mapPaymentErrorToTypedError(paymentError string) error {
+	var temporaryChannelFailureRegex = regexp.MustCompile(`(?ms)TemporaryChannelFailure.*\b(?P<ShortChanId>\d+:\d+:\d+)\b`)
+
+	temporaryChannelFailure := temporaryChannelFailureRegex.FindStringSubmatch(paymentError)
+	if len(temporaryChannelFailure) > 0 {
+		// It's a temporary channel failure
+		shortChanId, _ := bdb.NewShortChanIdFromString(temporaryChannelFailure[1])
+
+		return bdb.TemporaryChannelFailureError{
+			ChanId: bdb.ChanId(shortChanId.ToUint64()),
+		}
+	}
+
+	return errors.Errorf("Could not send payment: %v", paymentError)
 }
 
 func makeTlsCertFromPath(path string) (*x509.CertPool, error) {

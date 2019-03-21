@@ -5,6 +5,14 @@ import (
 	"testing"
 )
 
+// Topology
+//
+// (A) --- (B)
+//   \     /  \
+//    \   /    \
+//     (C) --- (D) --- (E)
+//
+
 func TestPathfinder(t *testing.T) () {
 	edgeMap := make(bdb.EdgeMap)
 
@@ -33,13 +41,18 @@ func TestPathfinder(t *testing.T) () {
 		ToNode: "Dan",
 	}
 
+	edgeMap[5] = &bdb.Edge{
+		FromNode: "Dan",
+		ToNode: "Erin",
+	}
+
 	graph := &bdb.Graph{
 		Edges: edgeMap,
 	}
 
 	edgePaths := findPathsBetween(edgeMap[0], edgeMap[2], graph)
 
-	if len(edgePaths) != 1 {
-		t.Errorf("One path expected; got %v", len(edgePaths))
+	if len(edgePaths) != 2 {
+		t.Errorf("Two paths expected; got %v", len(edgePaths))
 	}
 }
