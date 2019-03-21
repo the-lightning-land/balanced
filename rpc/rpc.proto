@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package rpc;
+
+service Balance {
+    rpc GetInfo (GetInfoRequest) returns (GetInfoResponse) {
+    }
+    rpc Balance (BalanceRequest) returns (BalanceResponse) {
+    }
+}
+
+message GetInfoRequest {
+}
+
+message GetInfoResponse {
+    string version = 1;
+    string commit = 2;
+    string identityPubKey = 3;
+}
+
+
+message BalanceRequest {
+    uint64 fromChanId = 1;
+    uint64 toChanId = 2;
+}
+
+message BalanceResponse {
+    bool rebalanced = 1;
+}

@@ -1,6 +1,9 @@
 # balanced binary
 
 balanced
+balance/balance
+
+*.gexf
 
 # Binaries for programs and plugins
 *.exe
