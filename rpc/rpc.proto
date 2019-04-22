@@ -22,6 +22,7 @@ message GetInfoResponse {
 message BalanceRequest {
     uint64 fromChanId = 1;
     uint64 toChanId = 2;
+    uint64 amtMsat = 3;
 }
 
 message BalanceResponse {

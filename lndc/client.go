@@ -86,7 +86,9 @@ func (client *Client) Graph() (*bdb.Graph, error) {
 
 	edgeMap := make(bdb.EdgeMap)
 	for _, edge := range channelGraph.Edges {
-		if edge.Node2Policy != nil {
+		if edge.Node1Policy != nil {
+			policy := edge.Node1Policy
+
 			edgeMap[bdb.EdgeId(edge.ChannelId)] = &bdb.Edge{
 				Id:         bdb.EdgeId(edge.ChannelId),
 				FromNode:   bdb.PubKey(edge.Node1Pub),
@@ -96,18 +98,20 @@ func (client *Client) Graph() (*bdb.Graph, error) {
 				ChanPoint:  edge.ChanPoint,
 				LastUpdate: edge.LastUpdate,
 				Policy: &bdb.RoutingPolicy{
-					FeeRateMilliMsat: edge.Node2Policy.FeeRateMilliMsat,
-					FeeBaseMsat:      edge.Node2Policy.FeeBaseMsat,
-					TimeLockDelta:    edge.Node2Policy.TimeLockDelta,
-					Disabled:         edge.Node2Policy.Disabled,
-					MaxHtlcMsat:      edge.Node2Policy.MaxHtlcMsat,
-					MinHtlc:          edge.Node2Policy.MinHtlc,
+					FeeRateMilliMsat: policy.FeeRateMilliMsat,
+					FeeBaseMsat:      policy.FeeBaseMsat,
+					TimeLockDelta:    policy.TimeLockDelta,
+					Disabled:         policy.Disabled,
+					MaxHtlcMsat:      policy.MaxHtlcMsat,
+					MinHtlc:          policy.MinHtlc,
 				},
 			}
 		}
 
-		if edge.Node1Policy != nil {
-			edgeMap[bdb.EdgeId(edge.ChannelId)+1] = &bdb.Edge{
+		if edge.Node2Policy != nil {
+			policy := edge.Node2Policy
+
+			edgeMap[bdb.EdgeId(edge.ChannelId+1)] = &bdb.Edge{
 				Id:         bdb.EdgeId(edge.ChannelId),
 				FromNode:   bdb.PubKey(edge.Node2Pub),
 				ToNode:     bdb.PubKey(edge.Node1Pub),
@@ -116,12 +120,12 @@ func (client *Client) Graph() (*bdb.Graph, error) {
 				ChanPoint:  edge.ChanPoint,
 				LastUpdate: edge.LastUpdate,
 				Policy: &bdb.RoutingPolicy{
-					FeeRateMilliMsat: edge.Node1Policy.FeeRateMilliMsat,
-					FeeBaseMsat:      edge.Node1Policy.FeeBaseMsat,
-					TimeLockDelta:    edge.Node1Policy.TimeLockDelta,
-					Disabled:         edge.Node1Policy.Disabled,
-					MaxHtlcMsat:      edge.Node1Policy.MaxHtlcMsat,
-					MinHtlc:          edge.Node1Policy.MinHtlc,
+					FeeRateMilliMsat: policy.FeeRateMilliMsat,
+					FeeBaseMsat:      policy.FeeBaseMsat,
+					TimeLockDelta:    policy.TimeLockDelta,
+					Disabled:         policy.Disabled,
+					MaxHtlcMsat:      policy.MaxHtlcMsat,
+					MinHtlc:          policy.MinHtlc,
 				},
 			}
 		}
@@ -187,7 +191,7 @@ func (client *Client) Channels() (bdb.ChannelMap, error) {
 
 func (client *Client) AddInvoice(amt int64) (*bdb.Invoice, error) {
 	addInvoice, err := client.client.AddInvoice(client.context, &lnrpc.Invoice{
-		CltvExpiry: 9,
+		CltvExpiry: 14,
 		Value:      int64(0.001 * float32(amt)),
 	})
 	if err != nil {
@@ -226,7 +230,7 @@ func (client *Client) SendToRoute(req *lnrpc.SendToRouteRequest) (*bdb.Payment, 
 		// Extend the temporary channel failure error with amount that couldn't be forwarded
 		switch err := err.(type) {
 		case bdb.TemporaryChannelFailureError:
-			for _, hop := range req.Route.Hops {
+			for _, hop := range req.Routes[0].Hops {
 				if hop.ChanId == uint64(err.ChanId) {
 					err.AmtMsat = hop.AmtToForwardMsat
 				}
@@ -246,6 +250,7 @@ func (client *Client) SendToRoute(req *lnrpc.SendToRouteRequest) (*bdb.Payment, 
 
 func mapPaymentErrorToTypedError(paymentError string) error {
 	var temporaryChannelFailureRegex = regexp.MustCompile(`(?ms)TemporaryChannelFailure.*\b(?P<ShortChanId>\d+:\d+:\d+)\b`)
+	var feeInsufficientRegex = regexp.MustCompile(`(?ms)FeeInsufficient.*\b(?P<ShortChanId>\d+:\d+:\d+)\b`)
 
 	temporaryChannelFailure := temporaryChannelFailureRegex.FindStringSubmatch(paymentError)
 	if len(temporaryChannelFailure) > 0 {
@@ -253,6 +258,16 @@ func mapPaymentErrorToTypedError(paymentError string) error {
 		shortChanId, _ := bdb.NewShortChanIdFromString(temporaryChannelFailure[1])
 
 		return bdb.TemporaryChannelFailureError{
+			ChanId: bdb.ChanId(shortChanId.ToUint64()),
+		}
+	}
+
+	feeInsufficient := feeInsufficientRegex.FindStringSubmatch(paymentError)
+	if len(feeInsufficient) > 0 {
+		// There's insufficient fees
+		shortChanId, _ := bdb.NewShortChanIdFromString(feeInsufficient[1])
+
+		return bdb.FeeInsufficientError{
 			ChanId: bdb.ChanId(shortChanId.ToUint64()),
 		}
 	}

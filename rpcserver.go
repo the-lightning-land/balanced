@@ -42,9 +42,24 @@ func (s *rpcServer) GetInfo(ctx context.Context, req *rpc.GetInfoRequest) (*rpc.
 }
 
 func (s *rpcServer) Balance(ctx context.Context, req *rpc.BalanceRequest) (*rpc.BalanceResponse, error) {
-	rebalanced, err := s.balancer.Balance(bdb.ChanId(req.FromChanId), bdb.ChanId(req.ToChanId))
-	if err != nil {
-		return nil, errors.Errorf("Could not balance channel: %v", err)
+	var err error
+	rebalanced := false
+	amtMsat := int64(500000000)
+
+	if req.AmtMsat != 0 {
+		amtMsat = int64(req.AmtMsat)
+	}
+
+	if req.FromChanId != 0 && req.ToChanId == 0 {
+		rebalanced, err = s.balancer.Balance(amtMsat, bdb.ChanId(req.FromChanId), bdb.ChanId(req.ToChanId))
+		if err != nil {
+			return nil, errors.Errorf("Could not balance channel: %v", err)
+		}
+	} else if req.FromChanId != 0 && req.ToChanId != 0 {
+		rebalanced, err = s.balancer.Balance(amtMsat, bdb.ChanId(req.FromChanId), bdb.ChanId(req.ToChanId))
+		if err != nil {
+			return nil, errors.Errorf("Could not balance channel: %v", err)
+		}
 	}
 
 	return &rpc.BalanceResponse{

@@ -43,7 +43,7 @@ func balanceMain() error {
 	app.Commands = []cli.Command{
 		{
 			Name:      "balance",
-			ArgsUsage: "[from] [to]",
+			ArgsUsage: "[from] [to] [amt]",
 			Aliases:   []string{"b"},
 			Usage:     "balance a particular channel",
 			Action: func(c *cli.Context) error {
@@ -57,10 +57,12 @@ func balanceMain() error {
 
 				fromChanId, _ := strconv.Atoi(c.Args().Get(0))
 				toChanId, _ := strconv.Atoi(c.Args().Get(1))
+				amtMsat, _ := strconv.Atoi(c.Args().Get(2))
 
 				res, err := client.Balance(ctx, &rpc.BalanceRequest{
 					FromChanId: uint64(fromChanId),
 					ToChanId:   uint64(toChanId),
+					AmtMsat:    uint64(amtMsat),
 				})
 				if err != nil || !res.Rebalanced {
 					return errors.Errorf("Could not balance: %v", err)
