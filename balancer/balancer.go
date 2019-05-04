@@ -258,7 +258,7 @@ func (b *Balancer) balance(amtMsat int64, fullChannel *bdb.Channel, fullChannelE
 			continue
 		}
 
-		for amtMsat = amtMsat; amtMsat > 50000; amtMsat = amtMsat / 2 {
+		for amtMsat = amtMsat; amtMsat > 50000000; amtMsat = amtMsat / 2 {
 			b.logger.Infof("Attempting rebalance with %v sats", amtMsat/1000)
 
 			invoice, err := b.AddOrReuseInvoice(amtMsat)
